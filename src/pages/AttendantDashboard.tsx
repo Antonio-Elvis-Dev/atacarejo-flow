@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,14 +15,17 @@ import { Badge } from "@/components/ui/badge";
 import {
   Phone,
   PhoneCall,
-  RefreshCw,
   FileText,
   CheckCircle2,
   Loader2,
   Wifi,
   Clock,
+  Search,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
+import { toast } from "@/hooks/use-toast";
 
 interface Call {
   id: string;
@@ -65,20 +68,53 @@ interface AttendantDashboardProps {
 const AttendantDashboard = ({ onLogout }: AttendantDashboardProps) => {
   const [syncing, setSyncing] = useState(false);
   const [synced, setSynced] = useState(true);
+  const [syncedAt, setSyncedAt] = useState<Date>(new Date());
+  const [syncLabel, setSyncLabel] = useState("Sincronizado há 2 min");
   const [selectedCall, setSelectedCall] = useState<Call | null>(null);
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [responsible, setResponsible] = useState("");
+  const [highPriority, setHighPriority] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState<string[]>([]);
   const [registeredTickets, setRegisteredTickets] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Update sync label every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (synced && syncedAt) {
+        const diffMs = Date.now() - syncedAt.getTime();
+        const diffMin = Math.floor(diffMs / 60000);
+        if (diffMin < 1) setSyncLabel("Sincronizado agora");
+        else if (diffMin === 1) setSyncLabel("Sincronizado há 1 min");
+        else setSyncLabel(`Sincronizado há ${diffMin} min`);
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [synced, syncedAt]);
+
+  const filteredCalls = mockCalls.filter((call) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      call.client.toLowerCase().includes(q) ||
+      call.phone.includes(q) ||
+      call.id.toLowerCase().includes(q)
+    );
+  });
 
   const handleSync = async () => {
     setSyncing(true);
     setSynced(false);
     await new Promise((r) => setTimeout(r, 2000));
+    const now = new Date();
+    setSyncedAt(now);
+    setSyncLabel("Sincronizado agora");
     setSyncing(false);
     setSynced(true);
+    toast({
+      title: "✅ VoIP Sincronizado",
+      description: "Lista de chamadas atualizada com sucesso.",
+    });
   };
 
   const handleOpenTicket = (call: Call) => {
@@ -86,44 +122,57 @@ const AttendantDashboard = ({ onLogout }: AttendantDashboardProps) => {
     setCategory("");
     setDescription("");
     setResponsible("");
-    setSubmitted((prev) => prev.filter((id) => id !== call.id));
+    setHighPriority(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCall) return;
     setSubmitting(true);
-    // Simulate AI analysis
     await new Promise((r) => setTimeout(r, 2500));
     setSubmitting(false);
     setRegisteredTickets((prev) => [...prev, selectedCall.id]);
-    setSubmitted((prev) => [...prev, selectedCall.id]);
+    toast({
+      title: "📋 Ocorrência Registrada",
+      description: `Ticket ${selectedCall.id} gerado com sucesso${highPriority ? " — marcado como ALTA PRIORIDADE" : ""}.`,
+    });
     setSelectedCall(null);
   };
 
+  const pendingCount = mockCalls.filter((c) => !registeredTickets.includes(c.id)).length;
+
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader role="atendente" onLogout={onLogout} notifCount={mockCalls.length - registeredTickets.length} />
+      <AppHeader role="atendente" onLogout={onLogout} notifCount={pendingCount} />
 
-      <div className="p-6 max-w-7xl mx-auto">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="p-4 md:p-6 max-w-7xl mx-auto">
+        {/* Header row */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-foreground">Central de Atendimento</h2>
             <p className="text-sm text-muted-foreground mt-0.5">Gerencie as chamadas recebidas e registre ocorrências</p>
           </div>
-          <Button
-            variant="outline"
-            className="gap-2 font-medium"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            {syncing ? (
-              <Loader2 className="w-4 h-4 animate-spin text-accent" />
-            ) : (
-              <Wifi className="w-4 h-4 text-success" />
+          <div className="flex flex-col items-start sm:items-end gap-1">
+            <Button
+              variant="outline"
+              className="gap-2 font-medium"
+              onClick={handleSync}
+              disabled={syncing}
+            >
+              {syncing ? (
+                <Loader2 className="w-4 h-4 animate-spin text-accent" />
+              ) : (
+                <Wifi className="w-4 h-4 text-success" />
+              )}
+              {syncing ? "Sincronizando..." : "VoIP Sincronizado"}
+            </Button>
+            {synced && !syncing && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" />
+                {syncLabel}
+              </span>
             )}
-            {syncing ? "Sincronizando..." : synced ? "VoIP Sincronizado" : "Sincronizar VoIP"}
-          </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -133,11 +182,28 @@ const AttendantDashboard = ({ onLogout }: AttendantDashboardProps) => {
               <PhoneCall className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-semibold text-foreground">Chamadas Sincronizadas</span>
               <Badge variant="secondary" className="ml-auto text-xs font-medium">
-                {mockCalls.length - registeredTickets.length} pendentes
+                {pendingCount} pendentes
               </Badge>
             </div>
 
-            {mockCalls.map((call) => {
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por cliente, telefone ou ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 text-sm"
+              />
+            </div>
+
+            {filteredCalls.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Nenhuma chamada encontrada para "{searchQuery}"
+              </div>
+            )}
+
+            {filteredCalls.map((call) => {
               const isRegistered = registeredTickets.includes(call.id);
               const isSelected = selectedCall?.id === call.id;
 
@@ -206,8 +272,8 @@ const AttendantDashboard = ({ onLogout }: AttendantDashboardProps) => {
             {selectedCall ? (
               <Card className="border shadow-card">
                 <CardHeader className="pb-4 border-b">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-primary" />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <FileText className="w-4 h-4 text-primary flex-shrink-0" />
                     <CardTitle className="text-base font-bold text-foreground">
                       Registro de Ocorrência
                     </CardTitle>
@@ -269,6 +335,36 @@ const AttendantDashboard = ({ onLogout }: AttendantDashboardProps) => {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* High Priority Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setHighPriority((p) => !p)}
+                      className={`w-full flex items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-200 text-left ${
+                        highPriority
+                          ? "border-warning bg-warning-light"
+                          : "border-border bg-card hover:border-warning/50"
+                      }`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${
+                        highPriority ? "bg-warning text-warning-foreground" : "bg-muted text-muted-foreground"
+                      }`}>
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className={`text-sm font-semibold transition-colors ${highPriority ? "text-warning-foreground" : "text-foreground"}`}>
+                          Prioridade Alta
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {highPriority ? "Ticket será escalado como urgente" : "Clique para marcar como urgente"}
+                        </p>
+                      </div>
+                      <div className={`ml-auto w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        highPriority ? "border-warning bg-warning" : "border-border"
+                      }`}>
+                        {highPriority && <div className="w-2 h-2 rounded-full bg-warning-foreground" />}
+                      </div>
+                    </button>
 
                     <div className="flex gap-3 pt-2">
                       <Button
