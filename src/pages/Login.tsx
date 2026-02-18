@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Package2, Lock, Mail, Eye, EyeOff } from "lucide-react";
 
 interface LoginProps {
-  onLogin: (role: "atendente" | "encarregado") => void;
+  onLogin: (role: "atendente" | "encarregado" | "admin") => void;
 }
+
 
 const Login = ({ onLogin }: LoginProps) => {
   const [email, setEmail] = useState("");
@@ -20,8 +21,10 @@ const Login = ({ onLogin }: LoginProps) => {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 1000));
     setLoading(false);
-    // Demo: "encarregado@" => supervisor, else attendant
-    if (email.includes("encarregado")) {
+    // Demo routing: admin@ => Admin, encarregado@ => Supervisor, else Attendant
+    if (email.includes("admin")) {
+      onLogin("admin");
+    } else if (email.includes("encarregado")) {
       onLogin("encarregado");
     } else {
       onLogin("atendente");
@@ -48,8 +51,9 @@ const Login = ({ onLogin }: LoginProps) => {
         <Card className="border-0 shadow-elevated">
           <CardHeader className="pb-2">
             <CardTitle className="text-xl font-semibold text-foreground">Entrar na Plataforma</CardTitle>
-            <CardDescription>
-              Use <span className="font-medium text-accent">encarregado@empresa.com</span> para acessar como Encarregado
+          <CardDescription className="space-y-0.5">
+              <span className="block">Use <span className="font-medium text-accent">admin@empresa.com</span> para Admin</span>
+              <span className="block">Use <span className="font-medium text-accent">encarregado@empresa.com</span> para Encarregado</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
