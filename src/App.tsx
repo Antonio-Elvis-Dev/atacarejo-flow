@@ -1,27 +1,33 @@
+import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import Login from "./pages/Login";
+import AttendantDashboard from "./pages/AttendantDashboard";
+import SupervisorDashboard from "./pages/SupervisorDashboard";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+type Role = "atendente" | "encarregado" | null;
+
+const App = () => {
+  const [role, setRole] = useState<Role>(null);
+
+  const handleLogin = (r: "atendente" | "encarregado") => setRole(r);
+  const handleLogout = () => setRole(null);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        {role === null && <Login onLogin={handleLogin} />}
+        {role === "atendente" && <AttendantDashboard onLogout={handleLogout} />}
+        {role === "encarregado" && <SupervisorDashboard onLogout={handleLogout} />}
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
